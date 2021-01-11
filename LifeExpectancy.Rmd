@@ -1,0 +1,431 @@
+---
+title: "LifeExpectancy"
+author: "Douglas Melis"
+date: "10/18/2020"
+output: word_document
+---
+
+```{r}
+library(tidyverse)
+library(olsrr)
+library(MPV)
+library(car)
+library(cvTools)
+library(MASS)
+library(Metrics)
+
+options(scipen=999)
+```
+
+```{r}
+life <- read.csv("life expectancy.csv", header = T, stringsAsFactors = F)
+
+data <- life[,c(1,2,5)]
+data <- rename(data, Country = Location,
+                Year = Period,
+                Life.Expectancy = First.Tooltip)
+
+print(data)
+```
+```{r}
+clean_country_names <- function(data){
+  data[data == "Bolivia (Plurinational State of)"] <- "Bolivia"
+  data[data == "Democratic People's Republic of Korea"] <- "North Korea"
+  data[data == "Cote d'Ivoire"] <- "Côte d’Ivoire"
+  data[data == "CÃ´te d'Ivoire"] <- "Côte d’Ivoire"
+  data[data == "Czech Republic"] <- "Czechia"
+  data[data == "Egypt, Arab Rep."] <- "Egypt"
+  data[data == "Swaziland"] <- "Eswatini"
+  data[data == "Gambia, The"] <- "Gambia"
+  data[data == "Guinea Bissau"] <- "Guinea-Bissau"
+  data[data == "Iran (Islamic Republic of)"] <- "Iran"
+  data[data == "Iran, Islamic Rep."] <- "Iran"
+  data[data == "Kyrgyz Republic"] <- "Kyrgyzstan"
+  data[data == "Lao People's Democratic Republic"] <- "Laos"
+  data[data == "Lao PDR"] <- "Laos"
+  data[data == "Micronesia, Fed. Sts."] <- "Micronesia"
+  data[data == "Republic of Korea"] <- "South Korea"
+  data[data == "Korea, Rep."] <- "South Korea"
+  data[data == "Republic of Moldova"] <- "Moldova"
+  data[data == "Macedonia (TFYR)"] <- "North Macedonia"
+  data[data == "The former Yugoslav Republic of Macedonia"] <- "North Macedonia"
+  data[data == "Micronesia (Federated States of)"] <- "Micronesia"
+  data[data == "Micronesia (country)"] <- "Micronesia"
+  data[data == "Russian Federation"] <- "Russia"
+  data[data == "St. Lucia"] <- "Saint Lucia"
+  data[data == "St. Vincent and the Grenadines"] <- "Saint Vincent and the Grenadines"
+  data[data == "Slovak Republic"] <- "Slovakia"
+  data[data == "Sudan (until 2011)"] <- "Sudan"
+  data[data == "Syrian Arab Republic"] <- "Syria"
+  data[data == "Timor	Leste"] <- "Timor-Leste"
+  data[data == "United Kingdom of Great Britain and Northern Ireland"] <- "United Kingdom"
+  data[data == "United States of America"] <- "United States"
+  data[data == "Tanzania"] <- "United Republic of Tanzania"
+  data[data == "Venezuela (Bolivarian Republic of)"] <- "Venezuela"
+  data[data == "Venezuela, RB"] <- "Venezuela"
+  data[data == "Viet Nam"] <- "Vietnam"
+  data[data == "Yemen, Rep."] <- "Yemen"
+  data[data == "Brunei Darussalam"] <- "Brunei"
+  data[data == "Cape Verde"] <- "Cabo Verde"
+  data[data == "Congo, Rep."] <- "Congo"
+  data[data == "Congo, Dem. Rep."] <- "Democratic Republic of Congo"
+  data[data == "Democratic Republic of the Congo"] <- "Democratic Republic of Congo"
+  data[data == "DR Congo"] <- "Democratic Republic of Congo"
+  data[data == "Macedonia"] <- "North Macedonia"
+  data[data == "Timor"] <- "Timor-Leste"
+  data[data == "Bahamas, The"] <- "Bahamas"
+  data[data == "Korea, Dem. People’s Rep."] <- "North Korea"
+
+  
+  return(data)
+}
+
+
+data <- clean_country_names(data)
+```
+
+```{r}
+bmi <- read.csv("bmi.csv", header = T, stringsAsFactors = F)
+bmi <- bmi[,c(1,3,4,5,8)]
+names(bmi)[5] = "Obesity"
+names(bmi)[1] = "Country"
+
+bmi.men <- filter(bmi, Sex == 'Men')
+bmi.men <- rename(bmi.men, BMI.M = Mean.BMI,
+                Obesity.M = Obesity)
+bmi.men <- bmi.men[-2]
+
+bmi.women <- filter(bmi, Sex == 'Women')
+bmi.women <- rename(bmi.women, BMI.W = Mean.BMI,
+                Obesity.W = Obesity)
+bmi.women <- bmi.women[-2]
+
+bmi.both <- left_join(bmi.men, bmi.women, by = c("Country", "Year"))
+
+bmi.both[,"BMI"] <- rowMeans(bmi.both[,c('BMI.M', 'BMI.W')], na.rm=TRUE)
+bmi.both[,"Obesity"] <-rowMeans(bmi.both[,c('Obesity.M', 'Obesity.W')], na.rm=TRUE)
+
+bmi.both <- bmi.both[,c(1,2,7,8)]
+
+bmi.both <- clean_country_names(bmi.both)
+data <- left_join(data, bmi.both, by = c("Country", "Year"))
+print(data)
+
+```
+
+```{r}
+alcohol.00 <- read.csv("alcohol 00-09.csv", header = T, skip = 1, check.names = F, stringsAsFactors = F)
+alcohol.00 <- alcohol.00[,-c(2,3)]
+
+alcohol.00 <- gather(alcohol.00, `2009`, `2008`, `2007`, `2006`, `2005`, `2004`, `2003`, `2002`, `2001`, `2000`, key = "Year", value = "Alcohol")
+
+alcohol.10 <- read.csv("alcohol 10-18.csv", header = T, skip = 1, check.names = F, stringsAsFactors = F)
+alcohol.10 <- alcohol.10[,-c(2,3)]
+
+alcohol.10 <- gather(alcohol.10, `2018`, `2017`, `2016`, `2015`, `2014`, `2013`, `2012`, `2011`, `2010`, key = "Year", value = "Alcohol")
+
+alcohol <- rbind(alcohol.00, alcohol.10)
+
+alcohol[,"Year"] <- as.numeric(alcohol[,"Year"])
+
+alcohol <- clean_country_names(alcohol)
+data <- left_join(data, alcohol, by = c("Country", "Year"))
+print(data)
+```
+
+```{r}
+gdp <- read.csv("GDP per capita.csv", header = T, check.names = F, stringsAsFactors = F)
+gdp <- gdp[,c('Country Name', '2018', '2017', '2016', '2015', '2014', '2013', '2012', '2011', '2010',
+              '2009', '2008', '2007', '2006', '2005', '2004', '2003', '2002', '2001', '2000')]
+
+gdp <- gather(gdp, `2018`, `2017`, `2016`, `2015`, `2014`, `2013`, `2012`, `2011`, `2010`, `2009`,
+              `2008`, `2007`, `2006`, `2005`, `2004`, `2003`, `2002`, `2001`, `2000`, key = "Year", value = "GDP")
+
+gdp[,"Year"] <- as.numeric(gdp[,"Year"])
+names(gdp)[1] <- "Country"
+
+gdp <- clean_country_names(gdp)
+data <- left_join(data, gdp, by = c("Country", "Year"))
+print(data)
+```
+
+```{r}
+hiv <- read.csv("deaths-and-new-cases-of-hiv.csv", header = T, stringsAsFactors = F)
+hiv <- hiv[,c(1,3,5,6)]
+names(hiv) <- c("Country", "Year", "HIV.Prevalence", "HIV.Incidence")
+
+hiv <- clean_country_names(hiv)
+data <- left_join(data, hiv, by = c("Country", "Year"))
+print(data)
+```
+
+
+```{r}
+diabetes <- read.csv("diabetes.csv", header = T, stringsAsFactors = F)
+diabetes <- diabetes[,c(1,3,4,5)]
+names(diabetes)[4] = "Diabetes"
+names(diabetes)[1] = "Country"
+
+diabetes.men <- filter(diabetes, Sex == 'Men')
+diabetes.men <- rename(diabetes.men, Diabetes.M = Diabetes)
+diabetes.men <- diabetes.men[-2]
+
+diabetes.women <- filter(diabetes, Sex == 'Women')
+diabetes.women <- rename(diabetes.women, Diabetes.W = Diabetes)
+diabetes.women <- diabetes.women[-2]
+
+diabetes.both <- left_join(diabetes.men, diabetes.women, by = c("Country", "Year"))
+
+diabetes.both[,"Diabetes"] <- rowMeans(diabetes.both[,c('Diabetes.M', 'Diabetes.W')], na.rm=TRUE)
+
+diabetes.both <- diabetes.both[,c(1,2,5)]
+
+diabetes.both <- clean_country_names(diabetes.both)
+data <- left_join(data, diabetes.both, by = c("Country", "Year"))
+print(data)
+```
+
+
+```{r}
+bcg <- read.csv("bcg.csv", header = T, stringsAsFactors = F)
+bcg <- bcg[,c(1,3,4)]
+names(bcg) <- c("Country", "Year", "BCG")
+
+bcg <- subset(bcg, Year >= 2000)
+
+immunization <- bcg
+
+
+add_vaccine <- function(immunization, file.name, vaccine.name){
+  vaccine <- read.csv(file.name, header = T, stringsAsFactors = F)
+  vaccine <- vaccine[,c(1,3,4)]
+  names(vaccine) <- c("Country", "Year", vaccine.name)
+  
+  vaccine <- subset(vaccine, Year >= 2000)
+
+  immunization <- full_join(immunization, vaccine, by = c("Country", "Year"))
+  return(immunization)
+}
+
+immunization <- add_vaccine(immunization, "dtp3.csv", "DTP3")
+immunization <- add_vaccine(immunization, "hepb3.csv", "HepB3")
+immunization <- add_vaccine(immunization, "hib3.csv", "Hib3")
+immunization <- add_vaccine(immunization, "mcv1.csv", "MCV1")
+immunization <- add_vaccine(immunization, "mcv2.csv", "MCV2")
+immunization <- add_vaccine(immunization, "pab.csv", "PAB")
+immunization <- add_vaccine(immunization, "pcv3.csv", "PCV3")
+immunization <- add_vaccine(immunization, "pol3.csv", "Pol3")
+immunization <- add_vaccine(immunization, "rotac.csv", "RotaC")
+
+print(immunization)
+```
+```{r}
+immunization.avg <- immunization
+immunization.avg[,"Immunization"] <- rowMeans(immunization.avg[,c('BCG', 'DTP3', 'HepB3', 'Hib3','Pol3', 'MCV1',
+                                                 'MCV2', 'PAB', 'PCV3', 'RotaC')], na.rm=TRUE)
+
+immunization.avg <- immunization.avg[,c("Country", "Year", "Immunization")]
+
+data <- left_join(data, immunization.avg, by = c("Country", "Year"))
+print(data)
+```
+
+
+```{r}
+data <- data[,c("Life.Expectancy", "BMI", "Obesity", "Alcohol", "GDP", "HIV.Prevalence", "HIV.Incidence", 
+                              "Diabetes", "Immunization")]
+
+
+data <- data[complete.cases(data),]
+
+normalize <- function(x){
+    return((x- min(x)) /(max(x)-min(x)))
+}
+
+data.norm <- lapply(data, normalize)
+
+data.norm <- as.data.frame(data.norm)
+```
+
+
+```{r}
+for(i in 2:ncol(data.norm)){
+  scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,i])
+}
+
+pairs(data.norm, lower.panel = NULL)
+```
+
+```{r}
+data.norm[,"GDP.ln"] <- as.data.frame(normalize(log(data[,"GDP"])))
+
+scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"GDP"])
+scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"GDP.ln"])
+
+data.norm[,"BMI.abs"] <- as.data.frame(normalize(abs(data[,"BMI"] - 21.7)))
+
+scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"BMI"])
+scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"BMI.abs"])
+```
+
+```{r}
+data.split = sort(sample(nrow(data.norm), nrow(data.norm)*.8))
+
+data.train = data.norm[data.split,]
+data.test = data.norm[-data.split,]
+```
+
+
+```{r}
+fit <- lm(Life.Expectancy ~ ., data.train)
+stepwise <- ols_step_both_p(fit, pent=.04, prem=.05)
+stepwise
+summary(stepwise$model)
+plot(stepwise, which=1)
+```
+
+```{r}
+fit1 <- stepwise$model
+summary(fit1)
+plot(model.1)
+
+#Tests
+PRESS(model.1)
+vif(fit1)
+ols_test_normality(model.1)
+```
+
+
+```{r}
+fit2 <- ols_step_forward_p(fit, pent=.05)
+forward
+summary(forward$model)
+plot(forward, which=1)
+vif(fit2$model)
+```
+
+```{r}
+fit2 <- lm(Life.Expectancy ~ BMI.abs + GDP.ln + Immunization + HIV.Incidence + Alcohol + Diabetes + Obesity, data.train)
+summary(fit2)
+
+plot(fit2)
+
+#Tests
+PRESS(fit2)
+vif(fit2)
+ols_test_normality(fit2)
+```
+
+```{r}
+fit3 <- lm(Life.Expectancy ~ BMI.abs + GDP + Immunization + HIV.Incidence + Alcohol + Diabetes + HIV.Prevalence, data.train)
+summary(fit3)
+
+plot(fit3)
+
+#Tests
+PRESS(fit3)
+vif(fit3)
+ols_test_normality(fit3)
+```
+
+
+```{r}
+fit4 <- lm(Life.Expectancy ~ BMI.abs + GDP + Immunization + HIV.Incidence + Alcohol + Diabetes, data.train)
+summary(fit4)
+
+plot(fit4)
+
+#Tests
+PRESS(fit4)
+vif(fit4)
+ols_test_normality(fit4)
+```
+
+```{r}
+fit5 <- lm(Life.Expectancy ~ BMI + BMI.abs + GDP.ln + Immunization + HIV.Incidence + Alcohol + GDP + Diabetes, data.train)
+summary(fit5)
+
+plot(fit5)
+
+#Tests
+PRESS(fit5)
+vif(fit5)
+ols_test_normality(fit5)
+```
+
+```{r}
+fit5.5 <- lm(Life.Expectancy ~ BMI.abs + GDP.ln + Immunization + HIV.Incidence + Alcohol + Diabetes, data.train)
+summary(fit5.5)
+
+plot(fit5)
+
+#Tests
+PRESS(fit5.5)
+vif(fit5.5)
+ols_test_normality(fit5.5)
+```
+
+
+```{r}
+fit6 <- lm(Life.Expectancy ~ BMI.abs + GDP.ln + Immunization + HIV.Incidence + Alcohol + Diabetes + Obesity, data.train)
+summary(fit6)
+
+plot(fit6)
+
+#Tests
+PRESS(fit6)
+vif(fit6)
+ols_test_normality(fit6)
+```
+```{r}
+fit7 <- lm(Life.Expectancy ~ BMI + BMI.abs + GDP + GDP.ln + Immunization + HIV.Incidence + Alcohol + Diabetes + Obesity, data.train)
+summary(fit7)
+
+plot(fit7)
+
+#Tests
+PRESS(fit7)
+vif(fit7)
+ols_test_normality(fit7)
+```
+
+
+```{r}
+folds <- cvFolds(nrow(data.train), K = 10, R =100)
+cvfit3 <- cvLm(fit3, cost = rtmspe,folds = folds)
+cvfit4 <- cvLm(fit4, cost = rtmspe,folds = folds)
+cvfit5 <- cvLm(fit5, cost = rtmspe,folds = folds)
+cvfit5.5 <- cvLm(fit5.5, cost = rtmspe,folds = folds)
+cvfit6 <- cvLm(fit6, cost = rtmspe,folds = folds)
+cvfit7 <- cvLm(fit7, cost = rtmspe,folds = folds)
+cvFits <- cvSelect(Model1 = cvfit5, Model2 = cvfit7, Model3 = cvfit5.5, Model4 = cvfit6)
+cvFits
+```
+
+```{r}
+test.labels <- data.test[,1]
+test <- data.test[,-1]
+pred <- predict(fit5.5, test)
+
+mae <- mae(test.labels, pred)
+print(mae)
+mse <- mse(test.labels, pred)
+print(mse)
+rmse <- rmse(test.labels, pred)
+print(rmse)
+mape <- mape(test.labels, pred)
+print(mape)
+smape <- smape(test.labels, pred)*100
+print(smape)
+print(100-smape)
+
+rsq <- function(x, y){
+  return(cor(x, y) ^ 2)
+}
+
+rsq <- rsq(test.labels, pred)
+print(rsq)
+
+
+```
+
