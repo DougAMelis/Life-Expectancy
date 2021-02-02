@@ -18,7 +18,7 @@ options(scipen=999)
 ```
 
 ```{r}
-life <- read.csv("life expectancy.csv", header = T, stringsAsFactors = F)
+life <- read.csv("data/life expectancy.csv", header = T, stringsAsFactors = F)
 
 data <- life[,c(1,2,5)]
 data <- rename(data, Country = Location,
