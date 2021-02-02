@@ -17,6 +17,8 @@ library(Metrics)
 options(scipen=999)
 ```
 
+#Data Preprocessing
+
 Not all of the data sets I used have the standardized country code, so I had to use country names to match up the records. Unfortuantely, a number of countries have multiple names or slight variations in spellings or format. Therefore, the first step was to create a function to clean the country names column in each dataset. The function I created runs through a set of name variations and replaces each one with the variation I selected for the final dataset.
 ```{r}
 clean_country_names <- function(data){
@@ -247,7 +249,9 @@ data.norm <- lapply(data, normalize)
 data.norm <- as.data.frame(data.norm)
 ```
 
+#Exploring the Data
 
+I created scatterplots with life expectancy on the left axis for each of my regressors. I also created a scatterplot matrix of all variables to examine how each variable interacted with each of the others.
 ```{r}
 for(i in 2:ncol(data.norm)){
   scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,i])
@@ -256,18 +260,25 @@ for(i in 2:ncol(data.norm)){
 pairs(data.norm, lower.panel = NULL)
 ```
 
+I noticed that the fourth graph (life expectancy versus GDP) had a sharp bend, indicating that the relationship could be exponential.
+I created a new variable to be the natural log of the original, non-normalized GDP variable. I then normalized this new natural log of GDP variable. I then made a scatterplot with life expectancy on the y-axis and the natural log of GDP on the x-axis and compared it to the original. The graph of life expectancy versus natural log of GDP did not have the bend in it and closely resembled a strong linear relationship.
 ```{r}
 data.norm[,"GDP.ln"] <- as.data.frame(normalize(log(data[,"GDP"])))
 
 scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"GDP"])
 scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"GDP.ln"])
+```
 
+I noticed that the first graph (life expectancy versus BMI) was curved and that the highest values were in the middle, indicating that the relationship may not be linear.
+I took the median value of the healthy BMI range, 21.7, and subtracted it from the original, non-normalized BMI column, took the absolute value, and normalized it. I then created a scatterplot with life expectancy on the y-axis and the new absolute value BMI on the x-axis and compared it to the original. The graph of life expectancy versus absolute value BMI appeared only slightly more linear than the original BMI graph.
+```{r}
 data.norm[,"BMI.abs"] <- as.data.frame(normalize(abs(data[,"BMI"] - 21.7)))
 
 scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"BMI"])
 scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"BMI.abs"])
 ```
 
+I randomly split the data into a test set and a train set.
 ```{r}
 data.split = sort(sample(nrow(data.norm), nrow(data.norm)*.8))
 
@@ -275,137 +286,55 @@ data.train = data.norm[data.split,]
 data.test = data.norm[-data.split,]
 ```
 
+#Finding the Best Predictors
 
+I created a model named baseline with all regressors. This baseline will be used to compare to the models with the best predictors.
+For each of the models, I calculated the PRESS statistic, and variance inflation factors for the model. Then I tested for normality.
+For Model 1, I used stepwise regression to select the regressors.
 ```{r}
-fit <- lm(Life.Expectancy ~ ., data.train)
-stepwise <- ols_step_both_p(fit, pent=.04, prem=.05)
+baseline <- lm(Life.Expectancy ~ ., data.train)
+stepwise <- ols_step_both_p(baseline, pent=.04, prem=.05)
 stepwise
-summary(stepwise$model)
+model.1 <- lm(Life.Expectancy ~ GDP.ln + Immunization + HIV.Prevalence + BMI.abs + BMI + Diabetes + Alcohol + GDP, data.train)
+summary(model.1)
 plot(stepwise, which=1)
-```
-
-```{r}
-fit1 <- stepwise$model
-summary(fit1)
 plot(model.1)
 
 #Tests
 PRESS(model.1)
-vif(fit1)
+vif(model.1)
 ols_test_normality(model.1)
 ```
 
 
+Unfortunately, using both the mean BMI and the mean BMI's absolute value will be problematic in the model and cause severe multicollinearity. The same goes for using both the natural log of GDP and the unaltered GDP. Since the absolute value BMI and the natural log of GDP performed better than their unaltered counterparts, I created a second model that used absolute value BMI and the natural log of GDP and the other regressors selected by stepwise regression without the unaltered BMI and GDP.
 ```{r}
-fit2 <- ols_step_forward_p(fit, pent=.05)
-forward
-summary(forward$model)
-plot(forward, which=1)
-vif(fit2$model)
-```
-
-```{r}
-fit2 <- lm(Life.Expectancy ~ BMI.abs + GDP.ln + Immunization + HIV.Incidence + Alcohol + Diabetes + Obesity, data.train)
-summary(fit2)
-
-plot(fit2)
+model.2 <- lm(Life.Expectancy ~ GDP.ln + Immunization + HIV.Prevalence + BMI.abs + Diabetes + Alcohol, data.train)
+summary(model.2)
+plot(model.2)
 
 #Tests
-PRESS(fit2)
-vif(fit2)
-ols_test_normality(fit2)
+PRESS(model.2)
+vif(model.2)
+ols_test_normality(model.2)
 ```
 
-```{r}
-fit3 <- lm(Life.Expectancy ~ BMI.abs + GDP + Immunization + HIV.Incidence + Alcohol + Diabetes + HIV.Prevalence, data.train)
-summary(fit3)
+#Selecting the Best Model
 
-plot(fit3)
-
-#Tests
-PRESS(fit3)
-vif(fit3)
-ols_test_normality(fit3)
-```
-
-
-```{r}
-fit4 <- lm(Life.Expectancy ~ BMI.abs + GDP + Immunization + HIV.Incidence + Alcohol + Diabetes, data.train)
-summary(fit4)
-
-plot(fit4)
-
-#Tests
-PRESS(fit4)
-vif(fit4)
-ols_test_normality(fit4)
-```
-
-```{r}
-fit5 <- lm(Life.Expectancy ~ BMI + BMI.abs + GDP.ln + Immunization + HIV.Incidence + Alcohol + GDP + Diabetes, data.train)
-summary(fit5)
-
-plot(fit5)
-
-#Tests
-PRESS(fit5)
-vif(fit5)
-ols_test_normality(fit5)
-```
-
-```{r}
-fit5.5 <- lm(Life.Expectancy ~ BMI.abs + GDP.ln + Immunization + HIV.Incidence + Alcohol + Diabetes, data.train)
-summary(fit5.5)
-
-plot(fit5)
-
-#Tests
-PRESS(fit5.5)
-vif(fit5.5)
-ols_test_normality(fit5.5)
-```
-
-
-```{r}
-fit6 <- lm(Life.Expectancy ~ BMI.abs + GDP.ln + Immunization + HIV.Incidence + Alcohol + Diabetes + Obesity, data.train)
-summary(fit6)
-
-plot(fit6)
-
-#Tests
-PRESS(fit6)
-vif(fit6)
-ols_test_normality(fit6)
-```
-```{r}
-fit7 <- lm(Life.Expectancy ~ BMI + BMI.abs + GDP + GDP.ln + Immunization + HIV.Incidence + Alcohol + Diabetes + Obesity, data.train)
-summary(fit7)
-
-plot(fit7)
-
-#Tests
-PRESS(fit7)
-vif(fit7)
-ols_test_normality(fit7)
-```
-
-
+I performed cross validation on my models.
 ```{r}
 folds <- cvFolds(nrow(data.train), K = 10, R =100)
-cvfit3 <- cvLm(fit3, cost = rtmspe,folds = folds)
-cvfit4 <- cvLm(fit4, cost = rtmspe,folds = folds)
-cvfit5 <- cvLm(fit5, cost = rtmspe,folds = folds)
-cvfit5.5 <- cvLm(fit5.5, cost = rtmspe,folds = folds)
-cvfit6 <- cvLm(fit6, cost = rtmspe,folds = folds)
-cvfit7 <- cvLm(fit7, cost = rtmspe,folds = folds)
-cvFits <- cvSelect(Model1 = cvfit5, Model2 = cvfit7, Model3 = cvfit5.5, Model4 = cvfit6)
+cvfit0 <- cvLm(baseline, cost = rtmspe, folds = folds)
+cvfit1 <- cvLm(model.1, cost = rtmspe, folds = folds)
+cvfit2 <- cvLm(model.2, cost = rtmspe, folds = folds)
+cvFits <- cvSelect(Baseline = cvfit0, Model1 = cvfit1, Model2 = cvfit2)
 cvFits
 ```
 
 ```{r}
 test.labels <- data.test[,1]
 test <- data.test[,-1]
-pred <- predict(fit5.5, test)
+pred <- predict(model.2, test)
 
 mae <- mae(test.labels, pred)
 print(mae)
