@@ -85,7 +85,7 @@ data <- clean_country_names(data)
 ```
 
 ```{r}
-bmi <- read.csv("bmi.csv", header = T, stringsAsFactors = F)
+bmi <- read.csv("data/bmi.csv", header = T, stringsAsFactors = F)
 bmi <- bmi[,c(1,3,4,5,8)]
 names(bmi)[5] = "Obesity"
 names(bmi)[1] = "Country"
@@ -114,12 +114,12 @@ print(data)
 ```
 
 ```{r}
-alcohol.00 <- read.csv("alcohol 00-09.csv", header = T, skip = 1, check.names = F, stringsAsFactors = F)
+alcohol.00 <- read.csv("data/alcohol 00-09.csv", header = T, skip = 1, check.names = F, stringsAsFactors = F)
 alcohol.00 <- alcohol.00[,-c(2,3)]
 
 alcohol.00 <- gather(alcohol.00, `2009`, `2008`, `2007`, `2006`, `2005`, `2004`, `2003`, `2002`, `2001`, `2000`, key = "Year", value = "Alcohol")
 
-alcohol.10 <- read.csv("alcohol 10-18.csv", header = T, skip = 1, check.names = F, stringsAsFactors = F)
+alcohol.10 <- read.csv("data/alcohol 10-18.csv", header = T, skip = 1, check.names = F, stringsAsFactors = F)
 alcohol.10 <- alcohol.10[,-c(2,3)]
 
 alcohol.10 <- gather(alcohol.10, `2018`, `2017`, `2016`, `2015`, `2014`, `2013`, `2012`, `2011`, `2010`, key = "Year", value = "Alcohol")
@@ -134,7 +134,7 @@ print(data)
 ```
 
 ```{r}
-gdp <- read.csv("GDP per capita.csv", header = T, check.names = F, stringsAsFactors = F)
+gdp <- read.csv("data/GDP per capita.csv", header = T, check.names = F, stringsAsFactors = F)
 gdp <- gdp[,c('Country Name', '2018', '2017', '2016', '2015', '2014', '2013', '2012', '2011', '2010',
               '2009', '2008', '2007', '2006', '2005', '2004', '2003', '2002', '2001', '2000')]
 
@@ -150,7 +150,7 @@ print(data)
 ```
 
 ```{r}
-hiv <- read.csv("deaths-and-new-cases-of-hiv.csv", header = T, stringsAsFactors = F)
+hiv <- read.csv("data/deaths-and-new-cases-of-hiv.csv", header = T, stringsAsFactors = F)
 hiv <- hiv[,c(1,3,5,6)]
 names(hiv) <- c("Country", "Year", "HIV.Prevalence", "HIV.Incidence")
 
@@ -161,7 +161,7 @@ print(data)
 
 
 ```{r}
-diabetes <- read.csv("diabetes.csv", header = T, stringsAsFactors = F)
+diabetes <- read.csv("data/diabetes.csv", header = T, stringsAsFactors = F)
 diabetes <- diabetes[,c(1,3,4,5)]
 names(diabetes)[4] = "Diabetes"
 names(diabetes)[1] = "Country"
@@ -187,7 +187,7 @@ print(data)
 
 
 ```{r}
-bcg <- read.csv("bcg.csv", header = T, stringsAsFactors = F)
+bcg <- read.csv("data/bcg.csv", header = T, stringsAsFactors = F)
 bcg <- bcg[,c(1,3,4)]
 names(bcg) <- c("Country", "Year", "BCG")
 
@@ -207,15 +207,15 @@ add_vaccine <- function(immunization, file.name, vaccine.name){
   return(immunization)
 }
 
-immunization <- add_vaccine(immunization, "dtp3.csv", "DTP3")
-immunization <- add_vaccine(immunization, "hepb3.csv", "HepB3")
-immunization <- add_vaccine(immunization, "hib3.csv", "Hib3")
-immunization <- add_vaccine(immunization, "mcv1.csv", "MCV1")
-immunization <- add_vaccine(immunization, "mcv2.csv", "MCV2")
-immunization <- add_vaccine(immunization, "pab.csv", "PAB")
-immunization <- add_vaccine(immunization, "pcv3.csv", "PCV3")
-immunization <- add_vaccine(immunization, "pol3.csv", "Pol3")
-immunization <- add_vaccine(immunization, "rotac.csv", "RotaC")
+immunization <- add_vaccine(immunization, "data/dtp3.csv", "DTP3")
+immunization <- add_vaccine(immunization, "data/hepb3.csv", "HepB3")
+immunization <- add_vaccine(immunization, "data/hib3.csv", "Hib3")
+immunization <- add_vaccine(immunization, "data/mcv1.csv", "MCV1")
+immunization <- add_vaccine(immunization, "data/mcv2.csv", "MCV2")
+immunization <- add_vaccine(immunization, "data/pab.csv", "PAB")
+immunization <- add_vaccine(immunization, "data/pcv3.csv", "PCV3")
+immunization <- add_vaccine(immunization, "data/pol3.csv", "Pol3")
+immunization <- add_vaccine(immunization, "data/rotac.csv", "RotaC")
 
 print(immunization)
 ```
