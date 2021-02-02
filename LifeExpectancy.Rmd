@@ -17,16 +17,7 @@ library(Metrics)
 options(scipen=999)
 ```
 
-```{r}
-life <- read.csv("data/life expectancy.csv", header = T, stringsAsFactors = F)
-
-data <- life[,c(1,2,5)]
-data <- rename(data, Country = Location,
-                Year = Period,
-                Life.Expectancy = First.Tooltip)
-
-print(data)
-```
+Not all of the data sets I used have the standardized country code, so I had to use country names to match up the records. Unfortuantely, a number of countries have multiple names or slight variations in spellings or format. Therefore, the first step was to create a function to clean the country names column in each dataset. The function I created runs through a set of name variations and replaces each one with the variation I selected for the final dataset.
 ```{r}
 clean_country_names <- function(data){
   data[data == "Bolivia (Plurinational State of)"] <- "Bolivia"
@@ -76,14 +67,23 @@ clean_country_names <- function(data){
   data[data == "Bahamas, The"] <- "Bahamas"
   data[data == "Korea, Dem. People’s Rep."] <- "North Korea"
 
-  
   return(data)
 }
+```
+Next I read in the data for the life expectancy variable, and removed the unnecessary columns. This data frame will act as the base that I joined to the data frames for the other variables.
+```{r}
+life <- read.csv("data/life expectancy.csv", header = T, stringsAsFactors = F)
 
-
+data <- life[,c(1,2,5)]
+data <- rename(data, Country = Location,
+                Year = Period,
+                Life.Expectancy = First.Tooltip)
 data <- clean_country_names(data)
+
+print(data)
 ```
 
+Both BMI and obesity are included in the same dataset; however, they were split up by sex, which scatters each record across two rows. In order to fix that, I had to spread the data. I filtered all of the male records into one table and all of the female ones into another. I renamed the columns and joined them into a single table where each record represented one year for one country, with columns for mean male BMI, mean female BMI, the prevalence of obesity in men, and prevalence of obesity in women. Then I was able to take the average of both BMI columns to create the mean BMI for the total population, and then take the average of both obesity prevalence columns to create the mean obesity prevalence for the total population. This method assumes that the countries have equal male and female populations for each year.
 ```{r}
 bmi <- read.csv("data/bmi.csv", header = T, stringsAsFactors = F)
 bmi <- bmi[,c(1,3,4,5,8)]
@@ -112,7 +112,7 @@ data <- left_join(data, bmi.both, by = c("Country", "Year"))
 print(data)
 
 ```
-
+The alcohol dataset was split into two files to be joined, the first having columns for the years 2000-2009, and the second having columns for the years 2010-2018. After being combined, they were still in the wrong format, as the columns were not different variables, just different values of the same variable: year. In order to clean that, I had to gather the columns into a new pair of variables, putting all of the years into one variable and the alcohol consumption levels into a second variable.
 ```{r}
 alcohol.00 <- read.csv("data/alcohol 00-09.csv", header = T, skip = 1, check.names = F, stringsAsFactors = F)
 alcohol.00 <- alcohol.00[,-c(2,3)]
@@ -133,6 +133,7 @@ data <- left_join(data, alcohol, by = c("Country", "Year"))
 print(data)
 ```
 
+The GDP dataset had the same structure as the alcohol consumption, so I used the same gather process, creating a year variable and a GDP variable.
 ```{r}
 gdp <- read.csv("data/GDP per capita.csv", header = T, check.names = F, stringsAsFactors = F)
 gdp <- gdp[,c('Country Name', '2018', '2017', '2016', '2015', '2014', '2013', '2012', '2011', '2010',
@@ -148,7 +149,7 @@ gdp <- clean_country_names(gdp)
 data <- left_join(data, gdp, by = c("Country", "Year"))
 print(data)
 ```
-
+The HIV/AIDS dataset was already in the required format, so I only had to remove the unnecessary columns.
 ```{r}
 hiv <- read.csv("data/deaths-and-new-cases-of-hiv.csv", header = T, stringsAsFactors = F)
 hiv <- hiv[,c(1,3,5,6)]
@@ -159,7 +160,7 @@ data <- left_join(data, hiv, by = c("Country", "Year"))
 print(data)
 ```
 
-
+The diabetes dataset had the same structure as the BMI and obesity dataset, so I used the same process to restructure the age-standardized diabetes prevalence data.
 ```{r}
 diabetes <- read.csv("data/diabetes.csv", header = T, stringsAsFactors = F)
 diabetes <- diabetes[,c(1,3,4,5)]
@@ -185,7 +186,7 @@ data <- left_join(data, diabetes.both, by = c("Country", "Year"))
 print(data)
 ```
 
-
+For the immunizations, I anticipated that using all ten of them would result in serious multicollinearity problems, so I decided to compute an average immunization coverage value for all ten immunizations. In order to do so, I joined the datasets for each vaccine into one immunization table. Then I created a new column that was the mean of the values in all the other columns.
 ```{r}
 bcg <- read.csv("data/bcg.csv", header = T, stringsAsFactors = F)
 bcg <- bcg[,c(1,3,4)]
@@ -218,8 +219,7 @@ immunization <- add_vaccine(immunization, "data/pol3.csv", "Pol3")
 immunization <- add_vaccine(immunization, "data/rotac.csv", "RotaC")
 
 print(immunization)
-```
-```{r}
+
 immunization.avg <- immunization
 immunization.avg[,"Immunization"] <- rowMeans(immunization.avg[,c('BCG', 'DTP3', 'HepB3', 'Hib3','Pol3', 'MCV1',
                                                  'MCV2', 'PAB', 'PCV3', 'RotaC')], na.rm=TRUE)
@@ -230,7 +230,7 @@ data <- left_join(data, immunization.avg, by = c("Country", "Year"))
 print(data)
 ```
 
-
+Since linear regression cannot handle missing values, I removed all records with at least one missing value. Next I used min/max normalization on the data since the scales are different for most of the variables.
 ```{r}
 data <- data[,c("Life.Expectancy", "BMI", "Obesity", "Alcohol", "GDP", "HIV.Prevalence", "HIV.Incidence", 
                               "Diabetes", "Immunization")]
