@@ -6,6 +6,7 @@ The models predict life expectancy within a country based on the GDP per capita 
 
 The data used for this project is collected through a variety of sources, but all files are .csv and in the data folder.
 The file LifeExpectancy.Rmd performs the data cleaning and preprocessing, and builds and compares several multiple linear regression models.
+The file LifeExpectancy.docx is the formatted output of the rmd file.
 
 
 
