@@ -262,25 +262,38 @@ pairs(data.norm, lower.panel = NULL)
 ```
 
 I noticed that the fourth graph (life expectancy versus GDP) had a sharp bend, indicating that the relationship could be exponential.
-I created a new variable to be the natural log of the original, non-normalized GDP variable. I then normalized this new natural log of GDP variable. I then made a scatterplot with life expectancy on the y-axis and the natural log of GDP on the x-axis and compared it to the original. The graph of life expectancy versus natural log of GDP did not have the bend in it and closely resembled a strong linear relationship.
+I created a new variable to be the natural log of the original, non-normalized GDP variable. I then normalized this new natural log of GDP variable. I then made a scatterplot with life expectancy on the y-axis and the natural log of GDP on the x-axis and compared it to the original. The graph of life expectancy versus natural log of GDP did not have the bend in it and closely resembled a strong linear relationship. Therefore, I used the natual log of GDP for the regression.
 ```{r}
 data.norm[,"GDP.ln"] <- as.data.frame(normalize(log(data[,"GDP"])))
 
 scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"GDP"])
 scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"GDP.ln"])
+
+```
+
+I noticed that the seventh graph (life expectancy versus diabetes) had a bend, similar to the bend in GDP. I carried out the same process on the diabetes variable to create the natural log of Diabetes. The graph of life expectancy versus natural log of diabetes appears to be more linear than that of the original. Therefore, I used the natural log of diabetes for the regression. 
+```{r}
+data.norm[,"Diabetes.ln"] <- as.data.frame(normalize(log(data[,"Diabetes"])))
+
+scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"Diabetes"])
+scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"Diabetes.ln"])
+
 ```
 
 I noticed that the first graph (life expectancy versus BMI) was curved and that the highest values were in the middle, indicating that the relationship may not be linear.
-I took the median value of the healthy BMI range, 21.7, and subtracted it from the original, non-normalized BMI column, took the absolute value, and normalized it. I then created a scatterplot with life expectancy on the y-axis and the new absolute value BMI on the x-axis and compared it to the original. The graph of life expectancy versus absolute value BMI appeared only slightly more linear than the original BMI graph.
+I took the median value of the healthy BMI range, 21.7, and subtracted it from the original, non-normalized BMI column, took the absolute value, and normalized it. I then created a scatterplot with life expectancy on the y-axis and the new absolute value BMI on the x-axis and compared it to the original. The graph of life expectancy versus absolute value BMI appeared only slightly more linear than the original BMI graph, if anything. Therefore, I did not use the absolute value of BMI for the regression.
 ```{r}
 data.norm[,"BMI.abs"] <- as.data.frame(normalize(abs(data[,"BMI"] - 21.7)))
 
 scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"BMI"])
 scatterplot(y=data.norm[,"Life.Expectancy"], x=data.norm[,"BMI.abs"])
+
+data.norm <- subset(data.norm, select = -BMI.abs)
 ```
 
 I randomly split the data into a test set and a train set.
 ```{r}
+set.seed(43)
 data.split = sort(sample(nrow(data.norm), nrow(data.norm)*.8))
 
 data.train = data.norm[data.split,]
@@ -289,73 +302,133 @@ data.test = data.norm[-data.split,]
 
 ## Finding the Best Predictors
 
-I created a model named baseline with all regressors. This baseline will be used to compare to the models with the best predictors.
-For each of the models, I calculated the PRESS statistic, and variance inflation factors for the model. Then I tested for normality.
-For Model 1, I used stepwise regression to select the regressors.
+For each of the models, I calculated the PRESS statistic, and variance inflation factors for the model. Then I tested for normality. I created a function to perform these tests.
 ```{r}
-baseline <- lm(Life.Expectancy ~ ., data.train)
-stepwise <- ols_step_both_p(baseline, pent=.04, prem=.05)
-stepwise
-model.1 <- lm(Life.Expectancy ~ GDP.ln + Immunization + HIV.Prevalence + BMI.abs + BMI + Diabetes + Alcohol + GDP, data.train)
-summary(model.1)
-plot(stepwise, which=1)
-plot(model.1)
+model_info <- function(model){
+  print(summary(model))
 
-#Tests
-PRESS(model.1)
-vif(model.1)
-ols_test_normality(model.1)
+  print(paste("PRESS:", PRESS(model), sep=' '))
+}
+
+```
+
+I created a model named baseline with all of the original regressors. This baseline does not include the modified regressors, such as natural log of GDP. This baseline will be used to compare to the models with the best predictors.
+```{r}
+baseline <- lm(Life.Expectancy ~ GDP + Immunization + HIV.Prevalence + BMI + HIV.Incidence + Diabetes + Alcohol + Obesity, data.train)
+model_info(baseline)
 ```
 
 
-Unfortunately, using both the mean BMI and the mean BMI's absolute value will be problematic in the model and cause severe multicollinearity. The same goes for using both the natural log of GDP and the unaltered GDP. Since the absolute value BMI and the natural log of GDP performed better than their unaltered counterparts, I created a second model that used absolute value BMI and the natural log of GDP and the other regressors selected by stepwise regression without the unaltered BMI and GDP.
+For Model 1, I used all regressors, but used natural log of GDP instead of the original GDP variable.
 ```{r}
-model.2 <- lm(Life.Expectancy ~ GDP.ln + Immunization + HIV.Prevalence + BMI.abs + Diabetes + Alcohol, data.train)
-summary(model.2)
-plot(model.2)
+model.1 <- lm(Life.Expectancy ~ GDP.ln + Immunization + HIV.Prevalence + BMI + HIV.Incidence + Diabetes + Alcohol + Obesity, data.train)
+model_info(model.1)
+```
 
-#Tests
-PRESS(model.2)
-vif(model.2)
-ols_test_normality(model.2)
+For Model 2, I used all regressors, but used natural log of diabetes instead of the original diabetes variable.
+```{r}
+model.2 <- lm(Life.Expectancy ~ GDP + Immunization + HIV.Prevalence + BMI + HIV.Incidence + Diabetes.ln + Alcohol + Obesity, data.train)
+model_info(model.2)
+```
+
+For Model 2, I used all regressors, but used both natural log of diabetes and natural log of GDP instead of the original diabetes and GDP variables.
+```{r}
+model.3 <- lm(Life.Expectancy ~ GDP.ln + Immunization + HIV.Prevalence + BMI + HIV.Incidence + Diabetes.ln + Alcohol + Obesity, data.train)
+model_info(model.3)
+```
+
+I made Models 4-7 to replicate the above, but used stepwise selection to eliminate unnecessary regressors.
+Model 4 is similar to the baseline, but obesity and HIV incidence were not used.
+```{r}
+stepwise.4 <- ols_step_forward_p(baseline, pent=.04)
+stepwise.4
+plot(stepwise.4, which=1)
+model.4 <- stepwise.4$model
+model_info(model.4)
+```
+
+Model 5 is similar to Model 1, but obesity and HIV incidence were not used.
+```{r}
+stepwise.5 <- ols_step_forward_p(model.1, pent=.04)
+stepwise.5
+plot(stepwise.5, which=1)
+model.5 <- stepwise.5$model
+model_info(model.5)
+```
+
+Model 6 is similar to Model 2, but obesity and HIV incidence are not used.
+```{r}
+stepwise.6 <- ols_step_forward_p(model.2, pent=.04)
+stepwise.6
+plot(stepwise.6, which=1)
+model.6 <- stepwise.6$model
+model_info(model.6)
+```
+
+Model 7 is similar to Model 3, but alcohol, obesity, and natural log of diabetes are unused.
+```{r}
+stepwise.7 <- ols_step_forward_p(model.3, pent=.04)
+stepwise.7
+plot(stepwise.7, which=1)
+model.7 <- stepwise.7$model
+model_info(model.7)
 ```
 
 ## Selecting the Best Model
 
-I performed cross validation on my models.
+I performed cross validation on my models, and compared the results.
 ```{r}
 folds <- cvFolds(nrow(data.train), K = 10, R =100)
 cvfit0 <- cvLm(baseline, cost = rtmspe, folds = folds)
 cvfit1 <- cvLm(model.1, cost = rtmspe, folds = folds)
 cvfit2 <- cvLm(model.2, cost = rtmspe, folds = folds)
-cvFits <- cvSelect(Baseline = cvfit0, Model1 = cvfit1, Model2 = cvfit2)
+cvfit3 <- cvLm(model.3, cost = rtmspe, folds = folds)
+cvfit4 <- cvLm(lm(model.4$terms, data.train), cost = rtmspe, folds = folds)
+cvfit5 <- cvLm(lm(model.5$terms, data.train), cost = rtmspe, folds = folds)
+cvfit6 <- cvLm(lm(model.6$terms, data.train), cost = rtmspe, folds = folds)
+cvfit7 <- cvLm(lm(model.7$terms, data.train), cost = rtmspe, folds = folds)
+cvFits <- cvSelect(Baseline = cvfit0, Model1 = cvfit1, Model2 = cvfit2, Model3 = cvfit3, Model4 = cvfit4,
+                   Model5 = cvfit5, Model6 = cvfit6, Model7 = cvfit7)
 cvFits
 ```
 
+Model 5 performed best in the cross validation, therefore it is the final model I selected. I then ran the test data through Model 5, and recorded several performance metrics.
 ```{r}
 test.labels <- data.test[,1]
 test <- data.test[,-1]
-pred <- predict(model.2, test)
+pred <- predict(model.5, test)
 
 mae <- mae(test.labels, pred)
-print(mae)
+print(paste("MAE", mae, sep=' '))
 mse <- mse(test.labels, pred)
-print(mse)
+print(paste("MSE", mse, sep=' '))
 rmse <- rmse(test.labels, pred)
-print(rmse)
+print(paste("RMSE", rmse, sep=' '))
 mape <- mape(test.labels, pred)
-print(mape)
+print(paste("MAPE", mape, sep=' '))
 smape <- smape(test.labels, pred)*100
-print(smape)
-print(100-smape)
+print(paste("SMAPE", smape, sep=' '))
 
 rsq <- function(x, y){
   return(cor(x, y) ^ 2)
 }
 
 rsq <- rsq(test.labels, pred)
-print(rsq)
+print(paste("RSQ", rsq, sep=' '))
 
+model_info(model.5)
+plot(model.5)
+print("VIF:")
+print(vif(model.5))
+ols_test_normality(model.5)
 
 ```
 
+## Results
+
+In the final model, every regressor estimate has a p-value < .05, indicating that they are all significant at the 95% confidence level.
+The model had a symmetric mean absolute percentage error on the test data of 13.11, indicating that on average, the model is off by 13.11% on data it has never seen. The model achieved an R2 of .7453, indicating the model accounts for about 74.53% of the data variation.
+
+The variance inflation factors for Model 5, are all below 5, indicating that there is no serious multicollinearity in the model.
+
+The Normal Q-Q plot for the model is very close to normal on the right side but deviates significantly on the left end. The residuals versus fitted plot indicates that the residuals do not have constant variance. The left side of the plot is more skewed towards positive residuals, the middle is more skewed towards negative residuals, and the right side has less variation. These plots indicate that while the model performs pretty well, it is not exactly adequate. Further, I performed four different tests for normality, Shapiro-Wilk, Kolmogorov-Smirnov, Cramer-von Mises, and Anderson-Darling. The p-values for all four tests were 0; therefore, we reject the null hypothesis that the data is normal. This rejection further indicates that the model is not exactly adequate for the data, even though it performs pretty well.
